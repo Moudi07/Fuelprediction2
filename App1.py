@@ -1,14 +1,14 @@
 import streamlit as st
 import numpy as np
-import joblib
+import pickle as pk
 import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
 
 # Load the pre-trained SVR model
-loaded_model = joblib.load(open("xgboost_model.sav", "rb"))
+loaded_model = pk.load(open("xgboost_model.sav", "rb"))
 
 # Load the fitted StandardScaler
-loaded_scaler = joblib.load(open("scaled_data.sav", "rb"))
+loaded_scaler = pk.load(open("scaled_data.sav", "rb"))
 
 def input_converter(inp):
     vcl = ['Two-seater','Minicompact','Compact','Subcompact','Mid-size','Full-size','SUV: Small','SUV: Standard','Minivan','Station wagon: Small','Station wagon: Mid-size','Pickup truck: Small','Special purpose vehicle','Pickup truck: Standard']
