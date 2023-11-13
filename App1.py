@@ -4,7 +4,7 @@ import joblib
 import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
 from geopy.geocoders import Nominatim
-import osmnx as ox
+import openrouteservice
 
 # Load the pre-trained SVR model
 loaded_model = joblib.load(open("svr_model.sav", "rb"))
@@ -13,6 +13,7 @@ loaded_model = joblib.load(open("svr_model.sav", "rb"))
 loaded_scaler = joblib.load(open("scaled_data.sav", "rb"))
 
 geolocator = Nominatim(user_agent="fuel_consumption_app")
+client = openrouteservice.Client(key="YOUR_OPENROUTESERVICE_API_KEY")  # Replace with your OpenRouteService API key
 
 def input_converter(inp):
     vcl = ['Two-seater','Minicompact','Compact','Subcompact','Mid-size','Full-size','SUV: Small','SUV: Standard','Minivan','Station wagon: Small','Station wagon: Mid-size','Pickup truck: Small','Special purpose vehicle','Pickup truck: Standard']
@@ -53,17 +54,14 @@ def input_converter(inp):
     prediction = loaded_model.predict(arr_scaled)
     return round(prediction[0], 2)
 
-def calculate_road_distance(point1, point2):
-    graph = ox.graph_from_point(point1, dist_type='network', network_type='drive')
-    route = ox.shortest_path(graph, point1, point2, weight='length')
-    road_distance = sum(ox.utils_graph.get_route_edge_attributes(graph, route, 'length'))
-    return road_distance / 1000.0  # Convert meters to kilometers
-
-def get_coordinates(location):
-    location_info = geolocator.geocode(location)
-    if location_info:
-        return location_info.latitude, location_info.longitude
-    else:
+def calculate_distance(location1, location2):
+    try:
+        # Get directions via road using OpenRouteService API
+        directions = client.directions(coordinates=[location1, location2], profile='driving-car', format='geojson')
+        distance_in_meters = directions['features'][0]['properties']['segments'][0]['distance']
+        distance_in_kilometers = distance_in_meters / 1000
+        return distance_in_kilometers
+    except openrouteservice.exceptions.ApiError:
         return None
 
 def main():
@@ -147,19 +145,25 @@ def main():
         location2_name = st.sidebar.text_input("Enter Location 2", "Los Angeles, CA")
 
         # Convert location names to coordinates
-        location1_coords = get_coordinates(location1_name)
-        location2_coords = get_coordinates(location2_name)
+        location1_coords = geolocator.geocode(location1_name)
+        location2_coords = geolocator.geocode(location2_name)
 
         if location1_coords and location2_coords:
-            # Calculate road distance between two locations
-            road_distance = calculate_road_distance(location1_coords, location2_coords)
-            st.info(f"The road distance between {location1_name} and {location2_name} is: {road_distance:.2f} kilometers")
+            location1 = [location1_coords.latitude, location1_coords.longitude]
+            location2 = [location2_coords.latitude, location2_coords.longitude]
 
-            # Calculate total fuel consumption based on road distance
-            total_fuel_used = result * road_distance
-            st.info(f"The estimated total fuel used is: {total_fuel_used:.2f} liters")
+            # Calculate distance between two locations
+            distance = calculate_distance(location1, location2)
+            if distance is not None:
+                st.info(f"The distance between {location1_name} and {location2_name} is: {distance:.2f} kilometers")
+
+                # Calculate total fuel consumption based on distance
+                total_fuel_used = result * distance
+                st.info(f"The estimated total fuel used is: {total_fuel_used:.2f} liters")
+            else:
+                st.error("Error calculating distance. Please try again.")
         else:
-            st.error("Invalid input. Please enter valid location names.")
+            st.error("Error geocoding locations. Please enter valid location names.")
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
