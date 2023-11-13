@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pickle as pk
+from xgboost import XGBRegressor
 import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
 
