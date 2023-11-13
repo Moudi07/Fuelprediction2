@@ -5,7 +5,7 @@ import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
 
 # Load the pre-trained SVR model
-loaded_model = joblib.load(open("svr_model.sav", "rb"))
+loaded_model = joblib.load(open("xgboost_model.sav", "rb"))
 
 # Load the fitted StandardScaler
 loaded_scaler = joblib.load(open("scaled_data.sav", "rb"))
