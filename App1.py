@@ -4,8 +4,7 @@ import joblib
 import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
 from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut
-from geopy.distance import geodesic
+import osmnx as ox
 
 # Load the pre-trained SVR model
 loaded_model = joblib.load(open("svr_model.sav", "rb"))
@@ -54,17 +53,17 @@ def input_converter(inp):
     prediction = loaded_model.predict(arr_scaled)
     return round(prediction[0], 2)
 
-def calculate_distance(point1, point2):
-    return geodesic(point1, point2).kilometers  # Calculate distance in kilometers
+def calculate_road_distance(point1, point2):
+    graph = ox.graph_from_point(point1, dist_type='network', network_type='drive')
+    route = ox.shortest_path(graph, point1, point2, weight='length')
+    road_distance = sum(ox.utils_graph.get_route_edge_attributes(graph, route, 'length'))
+    return road_distance / 1000.0  # Convert meters to kilometers
 
 def get_coordinates(location):
-    try:
-        location_info = geolocator.geocode(location)
-        if location_info:
-            return location_info.latitude, location_info.longitude
-        else:
-            return None
-    except GeocoderTimedOut:
+    location_info = geolocator.geocode(location)
+    if location_info:
+        return location_info.latitude, location_info.longitude
+    else:
         return None
 
 def main():
@@ -152,15 +151,15 @@ def main():
         location2_coords = get_coordinates(location2_name)
 
         if location1_coords and location2_coords:
-            # Calculate distance between two locations
-            distance = calculate_distance(location1_coords, location2_coords)
-            st.info(f"The distance between the two locations is: {distance:.2f} kilometers")
+            # Calculate road distance between two locations
+            road_distance = calculate_road_distance(location1_coords, location2_coords)
+            st.info(f"The road distance between {location1_name} and {location2_name} is: {road_distance:.2f} kilometers")
 
-            # Calculate total fuel consumption based on distance
-            total_fuel_used = result * distance
+            # Calculate total fuel consumption based on road distance
+            total_fuel_used = result * road_distance
             st.info(f"The estimated total fuel used is: {total_fuel_used:.2f} liters")
         else:
-            st.error("Error retrieving coordinates for one or both locations.")
+            st.error("Invalid input. Please enter valid location names.")
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
