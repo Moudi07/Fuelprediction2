@@ -1,11 +1,12 @@
 import streamlit as st
 import numpy as np
 import joblib
-from xgboost import XGBRegressor
+import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
+from geopy.distance import geodesic  # Import the geodesic function for distance calculation
 
 # Load the pre-trained SVR model
-loaded_model = joblib.load(open("xgboost_model.sav", "rb"))
+loaded_model = joblib.load(open("svr_model.sav", "rb"))
 
 # Load the fitted StandardScaler
 loaded_scaler = joblib.load(open("scaled_data.sav", "rb"))
@@ -49,6 +50,9 @@ def input_converter(inp):
     prediction = loaded_model.predict(arr_scaled)
     return round(prediction[0], 2)
 
+def calculate_distance(point1, point2):
+    return geodesic(point1, point2).kilometers  # Calculate distance in kilometers
+
 def main():
     # Set page configuration
     st.set_page_config(
@@ -62,7 +66,7 @@ def main():
         """
         <style>
             body {
-                background-image: url('https://www.satisgps.com/wp-content/uploads/2019/12/Paliwo_artykul04-1.png.');  /* Add your image URL here */
+                background-image: url('https://www.satisgps.com/wp-content/uploads/2019/12/Paliwo_artykul04-1.png.');
                 background-size: cover;
                 background-repeat: no-repeat;
                 background-attachment: fixed;
@@ -105,9 +109,44 @@ def main():
 
     user_input = [vehicle_class, engine_size, cylinders, transmission, CO2_rating, fuel_type]
 
+    # Add a map to the app using st.pydeck_chart
+    deck = pdk.Deck(
+        layers=[
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=[
+                    {"position": [37.7749, -122.4194], "color": [255, 0, 0], "radius": 100}
+                ],
+                radius_scale=10,
+            )
+        ]
+    )
+
+    st.pydeck_chart(deck)
+
     if st.button("Predict"):
         result = input_converter(user_input)
         st.success(f"The predicted fuel consumption is: {result} L/100km")
+
+        # Get user input for two locations
+        st.sidebar.subheader("Calculate Distance:")
+        location1 = st.sidebar.text_input("Enter Location 1 (lat, lon)", "37.7749, -122.4194")
+        location2 = st.sidebar.text_input("Enter Location 2 (lat, lon)", "37.7749, -122.4194")
+
+        try:
+            # Convert user input to tuples of floats
+            location1 = tuple(map(float, location1.split(',')))
+            location2 = tuple(map(float, location2.split(',')))
+
+            # Calculate distance between two locations
+            distance = calculate_distance(location1, location2)
+            st.info(f"The distance between the two locations is: {distance:.2f} kilometers")
+
+            # Calculate total fuel consumption based on distance
+            total_fuel_used = result * distance
+            st.info(f"The estimated total fuel used is: {total_fuel_used:.2f} liters")
+        except ValueError:
+            st.error("Invalid input format. Please enter latitude and longitude as 'lat, lon'.")
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
