@@ -3,13 +3,17 @@ import numpy as np
 import joblib
 import pydeck as pdk
 from sklearn.preprocessing import StandardScaler
-from geopy.distance import geodesic  # Import the geodesic function for distance calculation
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
+from geopy.distance import geodesic
 
 # Load the pre-trained SVR model
 loaded_model = joblib.load(open("svr_model.sav", "rb"))
 
 # Load the fitted StandardScaler
 loaded_scaler = joblib.load(open("scaled_data.sav", "rb"))
+
+geolocator = Nominatim(user_agent="fuel_consumption_app")
 
 def input_converter(inp):
     vcl = ['Two-seater','Minicompact','Compact','Subcompact','Mid-size','Full-size','SUV: Small','SUV: Standard','Minivan','Station wagon: Small','Station wagon: Mid-size','Pickup truck: Small','Special purpose vehicle','Pickup truck: Standard']
@@ -52,6 +56,16 @@ def input_converter(inp):
 
 def calculate_distance(point1, point2):
     return geodesic(point1, point2).kilometers  # Calculate distance in kilometers
+
+def get_coordinates(location):
+    try:
+        location_info = geolocator.geocode(location)
+        if location_info:
+            return location_info.latitude, location_info.longitude
+        else:
+            return None
+    except GeocoderTimedOut:
+        return None
 
 def main():
     # Set page configuration
@@ -130,23 +144,23 @@ def main():
 
         # Get user input for two locations
         st.sidebar.subheader("Calculate Distance:")
-        location1 = st.sidebar.text_input("Enter Location 1 (lat, lon)", "37.7749, -122.4194")
-        location2 = st.sidebar.text_input("Enter Location 2 (lat, lon)", "37.7749, -122.4194")
+        location1_name = st.sidebar.text_input("Enter Location 1", "San Francisco, CA")
+        location2_name = st.sidebar.text_input("Enter Location 2", "Los Angeles, CA")
 
-        try:
-            # Convert user input to tuples of floats
-            location1 = tuple(map(float, location1.split(',')))
-            location2 = tuple(map(float, location2.split(',')))
+        # Convert location names to coordinates
+        location1_coords = get_coordinates(location1_name)
+        location2_coords = get_coordinates(location2_name)
 
+        if location1_coords and location2_coords:
             # Calculate distance between two locations
-            distance = calculate_distance(location1, location2)
+            distance = calculate_distance(location1_coords, location2_coords)
             st.info(f"The distance between the two locations is: {distance:.2f} kilometers")
 
             # Calculate total fuel consumption based on distance
             total_fuel_used = result * distance
             st.info(f"The estimated total fuel used is: {total_fuel_used:.2f} liters")
-        except ValueError:
-            st.error("Invalid input format. Please enter latitude and longitude as 'lat, lon'.")
+        else:
+            st.error("Error retrieving coordinates for one or both locations.")
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
